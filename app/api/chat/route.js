@@ -12,8 +12,9 @@ You have two modes:
 - Search queries like: "site:linkedin.com [role] [level] 2025 hiring" or "[role] [level] jobs 2025 US hiring now"
 - Extract key details: Company, Role, Location, Experience Level, Posted Date, Application Link if available
 - Return results as a JSON array inside <jobs>...</jobs> tags with this structure:
-[{"company":"...", "role":"...", "location":"...", "level":"...", "posted":"...", "link":"...", "summary":"..."}]
+[{"company":"...", "role":"...", "location":"...", "level":"...", "posted":"...", "link":"...", "summary":"...", "fitScore": null, "fitReason": null}]
 - Include the "level" field (e.g. "Entry-Level", "Mid-Level", "Senior", "Staff") when known
+- If the user's profile includes skills or field/role, populate "fitScore" (integer 0–100) and "fitReason" (one concise sentence, e.g. "Strong match — Python and ML skills align with 4 of 5 core requirements"). Otherwise leave them null.
 - After the JSON, write a brief human-readable summary
 
 **MODE 2: SUGGEST POST** — When asked to write/suggest a LinkedIn post:

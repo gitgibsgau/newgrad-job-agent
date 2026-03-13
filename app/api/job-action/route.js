@@ -1,0 +1,38 @@
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export async function POST(req) {
+  try {
+    const { job, action, userProfile } = await req.json();
+
+    const profile =
+      userProfile?.name || userProfile?.field || userProfile?.skills
+        ? `Candidate profile — Name: ${userProfile.name || "not provided"}, Field/Role: ${userProfile.field || "not provided"}, Skills: ${userProfile.skills || "not provided"}, Experience: ${userProfile.experience || "not provided"}.`
+        : "";
+
+    const prompts = {
+      "cold-dm": `Write a short, personalized LinkedIn cold DM (under 120 words) to a recruiter at ${job.company} about the ${job.role} position in ${job.location}. ${profile} Make it genuine and conversational. End with a clear but low-pressure ask. Do NOT use openers like "I hope this message finds you well" or "I came across your profile". Go straight to the point.`,
+
+      "cover-letter": `Write a punchy 2-paragraph cover letter snippet for the ${job.role} role at ${job.company} in ${job.location}. ${profile} First paragraph: connect the candidate's background and skills directly to what this role needs. Second paragraph: show genuine enthusiasm for this specific company and role, and invite next steps. Keep it under 160 words total. No fluff.`,
+
+      "interview-prep": `Generate 5 likely interview questions for the ${job.role} role at ${job.company}. ${profile} Include a mix of behavioral, technical, and role-specific questions. For each, write a 1–2 sentence tip on how to answer it well. Format as:
+
+Q1: [question]
+Tip: [tip]
+
+Q2: ...`,
+    };
+
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 700,
+      messages: [{ role: "user", content: prompts[action] }],
+    });
+
+    return Response.json({ content: response.content[0]?.text || "" });
+  } catch (err) {
+    console.error(err);
+    return Response.json({ error: err.message }, { status: 500 });
+  }
+}
