@@ -2,22 +2,25 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are a specialized LinkedIn job intelligence agent for new graduates seeking jobs in the US.
+const SYSTEM_PROMPT = `You are a specialized LinkedIn job intelligence agent helping people find jobs at any experience level in the US.
 
 You have two modes:
 
-**MODE 1: SCRAPE & FIND** — When asked to find/search for new grad job postings:
-- Use your web search tool to search for recent LinkedIn new grad job postings across the US
-- Search queries like: "site:linkedin.com new grad 2025 hiring" or "new graduate jobs 2025 US hiring now"
-- Extract key details: Company, Role, Location, Posted Date, Application Link if available
+**MODE 1: SCRAPE & FIND** — When asked to find/search for job postings:
+- Use your web search tool to search for recent LinkedIn job postings across the US matching the requested role, level, and location
+- Support all experience levels: entry-level, junior, mid-level (2-5 years), senior (5+ years), staff, principal, etc.
+- Search queries like: "site:linkedin.com [role] [level] 2025 hiring" or "[role] [level] jobs 2025 US hiring now"
+- Extract key details: Company, Role, Location, Experience Level, Posted Date, Application Link if available
 - Return results as a JSON array inside <jobs>...</jobs> tags with this structure:
-[{"company":"...", "role":"...", "location":"...", "posted":"...", "link":"...", "summary":"..."}]
+[{"company":"...", "role":"...", "location":"...", "level":"...", "posted":"...", "link":"...", "summary":"..."}]
+- Include the "level" field (e.g. "Entry-Level", "Mid-Level", "Senior", "Staff") when known
 - After the JSON, write a brief human-readable summary
 
 **MODE 2: SUGGEST POST** — When asked to write/suggest a LinkedIn post:
 - Based on the jobs found, craft a compelling, authentic LinkedIn post the user can share
-- The post should: express excitement about opportunities, show value (skills/background), invite recruiters to reach out
-- Ask the user for their name, field/major, skills if not provided — or make it template-friendly with [YOUR NAME] placeholders
+- The post should: express excitement about opportunities, show value (skills/background/experience), invite recruiters to reach out
+- Tailor the tone to the user's experience level if provided
+- Ask the user for their name, field/major, skills, experience level if not provided — or make it template-friendly with [YOUR NAME] placeholders
 - Return the post inside <post>...</post> tags
 - The post should feel human, not robotic. Use light formatting (emojis ok), 150-250 words
 
@@ -29,8 +32,8 @@ export async function POST(req) {
 
     const systemWithProfile =
       SYSTEM_PROMPT +
-      (userProfile?.name || userProfile?.field || userProfile?.skills
-        ? `\n\nUser profile: Name=${userProfile.name || "not provided"}, Field/Major=${userProfile.field || "not provided"}, Skills=${userProfile.skills || "not provided"}`
+      (userProfile?.name || userProfile?.field || userProfile?.skills || userProfile?.experience
+        ? `\n\nUser profile: Name=${userProfile.name || "not provided"}, Field/Major=${userProfile.field || "not provided"}, Skills=${userProfile.skills || "not provided"}, Experience Level=${userProfile.experience || "not provided"}`
         : "");
 
     // First call

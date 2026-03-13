@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "New Grad Job Agent",
-  description: "LinkedIn job intelligence for new graduates",
+  title: "Job Intelligence Agent",
+  description: "LinkedIn job intelligence for all experience levels",
 };
 
 export default function RootLayout({ children }) {

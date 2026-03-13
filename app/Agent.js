@@ -26,9 +26,10 @@ const AgentLog = ({ logs }) => (
   </div>
 );
 
-const JobCard = ({ job, index }) => (
+const JobCard = ({ job, index, isSaved, onToggleSave }) => (
   <div style={{
-    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.03)",
+    border: isSaved ? "1px solid rgba(255,120,120,0.3)" : "1px solid rgba(255,255,255,0.1)",
     borderRadius: "12px", padding: "16px 20px", transition: "all 0.2s", cursor: "default",
     animation: `fadeSlideIn 0.4s ease ${index * 0.08}s both`,
   }}
@@ -36,21 +37,37 @@ const JobCard = ({ job, index }) => (
     onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
   >
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-      <div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "15px", color: "#f0f4ff" }}>{job.company}</div>
         <div style={{ fontSize: "13px", color: "#63d9b4", fontWeight: 500, marginTop: "2px" }}>{job.role}</div>
       </div>
-      {job.link && job.link !== "#" && (
-        <a href={job.link} target="_blank" rel="noopener noreferrer" style={{
-          fontSize: "11px", color: "#7eb8ff", textDecoration: "none",
-          background: "rgba(126,184,255,0.1)", padding: "4px 10px",
-          borderRadius: "20px", border: "1px solid rgba(126,184,255,0.2)", whiteSpace: "nowrap", flexShrink: 0
-        }}>View →</a>
-      )}
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0, marginLeft: "12px" }}>
+        <button
+          onClick={onToggleSave}
+          title={isSaved ? "Remove from saved" : "Save job"}
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            fontSize: "17px", padding: "2px 4px", lineHeight: 1,
+            transition: "transform 0.15s", display: "flex", alignItems: "center"
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.25)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+        >
+          {isSaved ? "❤️" : "🤍"}
+        </button>
+        {job.link && job.link !== "#" && (
+          <a href={job.link} target="_blank" rel="noopener noreferrer" style={{
+            fontSize: "11px", color: "#7eb8ff", textDecoration: "none",
+            background: "rgba(126,184,255,0.1)", padding: "4px 10px",
+            borderRadius: "20px", border: "1px solid rgba(126,184,255,0.2)", whiteSpace: "nowrap"
+          }}>View →</a>
+        )}
+      </div>
     </div>
     <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: "#7a8a9a", marginBottom: job.summary ? "10px" : 0 }}>
       <span>📍 {job.location}</span>
       {job.posted && <span>🕐 {job.posted}</span>}
+      {job.level && <span style={{ color: "#a0b8d0" }}>🎯 {job.level}</span>}
     </div>
     {job.summary && (
       <div style={{ fontSize: "12px", color: "#8a9ab0", lineHeight: 1.6, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px" }}>
@@ -88,14 +105,47 @@ export default function Agent() {
   const [loading, setLoading] = useState(false);
   const [agentLogs, setAgentLogs] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [savedJobs, setSavedJobs] = useState([]);
+  const [cityFilter, setCityFilter] = useState("");
   const [suggestedPost, setSuggestedPost] = useState("");
   const [activeTab, setActiveTab] = useState("chat");
-  const [userProfile, setUserProfile] = useState({ name: "", field: "", skills: "" });
+  const [userProfile, setUserProfile] = useState({ name: "", field: "", skills: "", experience: "" });
   const bottomRef = useRef(null);
+
+  // Load saved jobs from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("savedJobs") || "[]");
+      setSavedJobs(stored);
+    } catch {}
+  }, []);
+
+  // Persist saved jobs to localStorage
+  useEffect(() => {
+    localStorage.setItem("savedJobs", JSON.stringify(savedJobs));
+  }, [savedJobs]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, agentLogs]);
 
   const addLog = (type, message) => setAgentLogs(prev => [...prev, { type, message }]);
+
+  const toggleSaveJob = (job) => {
+    setSavedJobs(prev => {
+      const key = job.company + "||" + job.role;
+      const isAlready = prev.some(j => j.company + "||" + j.role === key);
+      return isAlready ? prev.filter(j => j.company + "||" + j.role !== key) : [...prev, job];
+    });
+  };
+
+  const isJobSaved = (job) => savedJobs.some(j => j.company + "||" + j.role === job.company + "||" + job.role);
+
+  const filteredJobs = cityFilter.trim()
+    ? jobs.filter(j => j.location?.toLowerCase().includes(cityFilter.toLowerCase()))
+    : jobs;
+
+  const filteredSaved = cityFilter.trim()
+    ? savedJobs.filter(j => j.location?.toLowerCase().includes(cityFilter.toLowerCase()))
+    : savedJobs;
 
   const runAgent = async (userMessage) => {
     setLoading(true);
@@ -145,10 +195,17 @@ export default function Agent() {
   const handleSend = () => { if (!input.trim() || loading) return; const msg = input.trim(); setInput(""); runAgent(msg); };
 
   const quickActions = [
-    { label: "🔍 Find New Grad Jobs", msg: "Search for new grad software engineer job postings on LinkedIn across the US in 2025." },
-    { label: "✍️ Write My Post", msg: "Based on the jobs you found, suggest a compelling LinkedIn post I can share to attract recruiters." },
-    { label: "🎯 CS New Grad Jobs", msg: "Find new grad computer science positions posted on LinkedIn in the last month across US tech companies." },
-    { label: "💼 Finance New Grad", msg: "Search LinkedIn for new grad finance analyst and investment banking positions across major US financial hubs." },
+    { label: "🎓 Entry-Level SWE Jobs", msg: "Search for entry-level software engineer job postings on LinkedIn across the US in 2025." },
+    { label: "🚀 Mid-Level SWE Jobs", msg: "Search LinkedIn for mid-level software engineer positions (2-5 years experience) across the US in 2025." },
+    { label: "⭐ Senior Engineer Jobs", msg: "Find senior software engineer positions (5+ years experience) posted on LinkedIn across major US tech hubs in 2025." },
+    { label: "💼 Finance Roles (All Levels)", msg: "Search LinkedIn for finance analyst, investment banking, and financial analyst positions at all experience levels across major US financial hubs." },
+  ];
+
+  const profileFields = [
+    { key: "name", placeholder: "Your name (e.g. Alex Chen)" },
+    { key: "field", placeholder: "Field / Major (e.g. CS, Finance)" },
+    { key: "skills", placeholder: "Top skills (e.g. Python, React)" },
+    { key: "experience", placeholder: "Experience level (e.g. Entry-Level, 3 yrs)" },
   ];
 
   return (
@@ -161,6 +218,7 @@ export default function Agent() {
         @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius:4px; }
         textarea { outline: none; }
+        input { outline: none; }
         .tab-btn { background: transparent; border: none; cursor: pointer; padding: 8px 16px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; transition: all 0.2s; }
         .tab-btn:hover { background: rgba(255,255,255,0.06); }
       `}</style>
@@ -169,9 +227,9 @@ export default function Agent() {
         {/* Header */}
         <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "18px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", backdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ width: 36, height: 36, borderRadius: "10px", background: "linear-gradient(135deg, #0077b5, #63d9b4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>🎓</div>
+            <div style={{ width: 36, height: 36, borderRadius: "10px", background: "linear-gradient(135deg, #0077b5, #63d9b4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>💼</div>
             <div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "17px", color: "#f0f4ff", letterSpacing: "-0.02em" }}>New Grad Job Agent</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "17px", color: "#f0f4ff", letterSpacing: "-0.02em" }}>Job Intelligence Agent</div>
               <div style={{ fontSize: "11px", color: "#5a7a9a", letterSpacing: "0.04em" }}>LinkedIn Intelligence · Powered by Claude AI</div>
             </div>
           </div>
@@ -184,7 +242,7 @@ export default function Agent() {
           <div style={{ borderRight: "1px solid rgba(255,255,255,0.07)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ padding: "18px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "12px", color: "#63d9b4", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "12px" }}>Your Profile</div>
-              {[{ key: "name", placeholder: "Your name (e.g. Alex Chen)" }, { key: "field", placeholder: "Field / Major (e.g. CS, Finance)" }, { key: "skills", placeholder: "Top skills (e.g. Python, React)" }].map(f => (
+              {profileFields.map(f => (
                 <input key={f.key} value={userProfile[f.key]} onChange={e => setUserProfile(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder}
                   style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "8px 10px", color: "#d0e0f0", fontSize: "12px", marginBottom: "8px", fontFamily: "'DM Sans', sans-serif" }} />
               ))}
@@ -209,20 +267,27 @@ export default function Agent() {
 
           {/* Right Panel */}
           <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* Tabs */}
             <div style={{ padding: "10px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: "4px" }}>
-              {[{ id: "chat", label: "💬 Chat" }, { id: "jobs", label: `🗂 Jobs ${jobs.length > 0 ? `(${jobs.length})` : ""}` }, { id: "post", label: "✍️ My Post" }].map(t => (
+              {[
+                { id: "chat", label: "💬 Chat" },
+                { id: "jobs", label: `🗂 Jobs${jobs.length > 0 ? ` (${jobs.length})` : ""}` },
+                { id: "saved", label: `❤️ Saved${savedJobs.length > 0 ? ` (${savedJobs.length})` : ""}` },
+                { id: "post", label: "✍️ My Post" },
+              ].map(t => (
                 <button key={t.id} className="tab-btn" onClick={() => setActiveTab(t.id)} style={{ color: activeTab === t.id ? "#f0f4ff" : "#5a7a9a", background: activeTab === t.id ? "rgba(255,255,255,0.08)" : "transparent", fontWeight: activeTab === t.id ? 600 : 400 }}>{t.label}</button>
               ))}
             </div>
 
             <div style={{ flex: 1, overflow: "auto", padding: "20px 24px" }}>
+              {/* Chat Tab */}
               {activeTab === "chat" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   {messages.length === 0 && (
                     <div style={{ textAlign: "center", padding: "60px 20px", animation: "fadeSlideIn 0.6s ease both" }}>
-                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎓</div>
-                      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "22px", color: "#f0f4ff", marginBottom: "10px" }}>New Grad Job Intelligence</div>
-                      <div style={{ color: "#5a7a9a", fontSize: "14px", maxWidth: "360px", margin: "0 auto", lineHeight: 1.7 }}>Ask me to find new grad job postings from LinkedIn, or generate a personalized post for you to share.</div>
+                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>💼</div>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "22px", color: "#f0f4ff", marginBottom: "10px" }}>Job Intelligence Agent</div>
+                      <div style={{ color: "#5a7a9a", fontSize: "14px", maxWidth: "380px", margin: "0 auto", lineHeight: 1.7 }}>Search for jobs at any experience level — entry, mid, or senior. Filter by city, save your favorites, and generate a LinkedIn post.</div>
                     </div>
                   )}
                   {messages.map((m, i) => (
@@ -240,23 +305,109 @@ export default function Agent() {
                   <div ref={bottomRef} />
                 </div>
               )}
+
+              {/* Jobs Tab */}
               {activeTab === "jobs" && (
                 <div>
                   {jobs.length === 0 ? (
                     <div style={{ textAlign: "center", padding: "60px 20px", color: "#3a5a7a" }}>
                       <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗂</div>
                       <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "16px", marginBottom: "8px", color: "#4a6a8a" }}>No Jobs Yet</div>
-                      <div style={{ fontSize: "13px" }}>Use the quick actions or ask me to find new grad jobs</div>
+                      <div style={{ fontSize: "13px" }}>Use the quick actions or ask me to find jobs</div>
                     </div>
                   ) : (
                     <div>
                       <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "20px", color: "#f0f4ff", marginBottom: "6px" }}>{jobs.length} Opportunities Found</div>
-                      <div style={{ fontSize: "13px", color: "#5a7a9a", marginBottom: "20px" }}>New grad positions across the US · Updated just now</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{jobs.map((job, i) => <JobCard key={i} job={job} index={i} />)}</div>
+                      <div style={{ fontSize: "13px", color: "#5a7a9a", marginBottom: "16px" }}>Positions across the US · Updated just now</div>
+
+                      {/* City Filter */}
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "18px" }}>
+                        <div style={{ position: "relative", flex: 1 }}>
+                          <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#5a7a9a" }}>📍</span>
+                          <input
+                            value={cityFilter}
+                            onChange={e => setCityFilter(e.target.value)}
+                            placeholder="Filter by city (e.g. San Francisco, NYC, Austin)..."
+                            style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "8px 12px 8px 30px", color: "#d0e0f0", fontSize: "13px", fontFamily: "'DM Sans', sans-serif" }}
+                          />
+                        </div>
+                        {cityFilter && (
+                          <button onClick={() => setCityFilter("")} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#a0b0c0", padding: "8px 14px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      {filteredJobs.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "40px 20px", color: "#3a5a7a" }}>
+                          <div style={{ fontSize: "30px", marginBottom: "10px" }}>🔍</div>
+                          <div style={{ fontSize: "14px", color: "#4a6a8a" }}>No jobs match "{cityFilter}"</div>
+                          <div style={{ fontSize: "12px", color: "#3a5a6a", marginTop: "6px" }}>Try a different city name</div>
+                        </div>
+                      ) : (
+                        <div>
+                          {cityFilter && <div style={{ fontSize: "12px", color: "#5a7a9a", marginBottom: "12px" }}>Showing {filteredJobs.length} of {jobs.length} jobs in "{cityFilter}"</div>}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                            {filteredJobs.map((job, i) => (
+                              <JobCard key={i} job={job} index={i} isSaved={isJobSaved(job)} onToggleSave={() => toggleSaveJob(job)} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
+
+              {/* Saved Tab */}
+              {activeTab === "saved" && (
+                <div>
+                  {savedJobs.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "60px 20px", color: "#3a5a7a" }}>
+                      <div style={{ fontSize: "40px", marginBottom: "12px" }}>🤍</div>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "16px", marginBottom: "8px", color: "#4a6a8a" }}>No Saved Jobs</div>
+                      <div style={{ fontSize: "13px" }}>Tap the heart icon on any job card to save it here</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "20px", color: "#f0f4ff", marginBottom: "6px" }}>❤️ Saved Jobs</div>
+                      <div style={{ fontSize: "13px", color: "#5a7a9a", marginBottom: "16px" }}>{savedJobs.length} job{savedJobs.length !== 1 ? "s" : ""} saved · Stored locally</div>
+
+                      {/* City Filter for Saved */}
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "18px" }}>
+                        <div style={{ position: "relative", flex: 1 }}>
+                          <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#5a7a9a" }}>📍</span>
+                          <input
+                            value={cityFilter}
+                            onChange={e => setCityFilter(e.target.value)}
+                            placeholder="Filter by city..."
+                            style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "8px 12px 8px 30px", color: "#d0e0f0", fontSize: "13px", fontFamily: "'DM Sans', sans-serif" }}
+                          />
+                        </div>
+                        {cityFilter && (
+                          <button onClick={() => setCityFilter("")} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#a0b0c0", padding: "8px 14px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      {filteredSaved.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "30px 20px", color: "#3a5a7a" }}>
+                          <div style={{ fontSize: "14px", color: "#4a6a8a" }}>No saved jobs match "{cityFilter}"</div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                          {filteredSaved.map((job, i) => (
+                            <JobCard key={i} job={job} index={i} isSaved={true} onToggleSave={() => toggleSaveJob(job)} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Post Tab */}
               {activeTab === "post" && (
                 <div>
                   {!suggestedPost ? (
@@ -282,7 +433,7 @@ export default function Agent() {
 
             <div style={{ padding: "16px 24px", borderTop: "1px solid rgba(255,255,255,0.07)", background: "rgba(0,0,0,0.15)" }}>
               <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
-                <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Ask me to find new grad jobs or write your LinkedIn post..." rows={2}
+                <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Search for jobs by role, level, or location — or ask me to write your LinkedIn post..." rows={2}
                   style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "12px 14px", color: "#e0eaf5", fontSize: "14px", resize: "none", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }} />
                 <button onClick={handleSend} disabled={loading || !input.trim()}
                   style={{ background: loading || !input.trim() ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #0077b5, #005f94)", border: "none", borderRadius: "12px", width: 44, height: 44, cursor: loading || !input.trim() ? "not-allowed" : "pointer", fontSize: "18px", transition: "all 0.2s", flexShrink: 0, color: "#fff" }}>
