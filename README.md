@@ -1,6 +1,14 @@
 # 🎓 New Grad Job Agent
 
-An agentic AI that finds LinkedIn new grad job postings across the US and generates personalized LinkedIn posts — powered by Claude AI.
+An agentic AI built for graduating students to **discover new grad job opportunities across the US** and **craft personalized LinkedIn posts** to attract recruiters — all powered by Claude AI with live web search.
+
+## ✨ Features
+
+- 🔍 **Live Job Search** — Searches the web in real-time for new grad job postings (SWE, finance, and more)
+- 🗂 **Job Board** — Displays company, role, location, and direct links in a clean card layout
+- ✍️ **LinkedIn Post Generator** — Writes a personalized, human-sounding post based on current openings
+- 🤖 **Agentic Loop** — Uses Claude + web search tool in a multi-step agent loop
+- 👤 **Profile Customization** — Tailors posts to your name, major, and skills
 
 ---
 
