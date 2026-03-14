@@ -142,7 +142,7 @@ const ActionPanel = ({ action, job, loading, content, onRegenerate }) => {
 
 // ─── JobCard ──────────────────────────────────────────────────────────────────
 
-const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddToPipeline, userProfile }) => {
+const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddToPipeline, userProfile, accessCode }) => {
   const [activeAction, setActiveAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionContent, setActionContent] = useState("");
@@ -164,7 +164,7 @@ const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddTo
     try {
       const res = await fetch("/api/job-action", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-access-code": accessCode },
         body: JSON.stringify({ job, action, userProfile }),
       });
       const data = await res.json();
@@ -442,9 +442,141 @@ const PostDisplay = ({ text }) => {
   );
 };
 
+// ─── GateScreen ───────────────────────────────────────────────────────────────
+
+const GateScreen = ({ onAuthorized }) => {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: trimmed }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        onAuthorized(trimmed);
+      } else {
+        setError("Invalid access code. Please check and try again.");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{
+      height: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: C.bg,
+      fontFamily: "Inter, sans-serif",
+    }}>
+      <div style={{
+        background: C.bgCard,
+        border: `1px solid ${C.border}`,
+        borderRadius: "20px",
+        padding: "40px 36px",
+        width: "100%",
+        maxWidth: "400px",
+        boxShadow: "0 8px 32px rgba(20,184,166,0.08)",
+        animation: "fadeSlideIn 0.4s ease both",
+      }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: "12px",
+            background: `linear-gradient(135deg, ${C.mint}, ${C.blue})`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px",
+          }}>🚀</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: "18px", color: C.text, letterSpacing: "-0.03em" }}>JobWing</div>
+            <div style={{ fontSize: "11px", color: C.text4 }}>Your AI job wingman</div>
+          </div>
+        </div>
+
+        <div style={{ fontWeight: 700, fontSize: "16px", color: C.text, marginBottom: "6px" }}>Enter access code</div>
+        <div style={{ fontSize: "13px", color: C.text3, marginBottom: "22px", lineHeight: 1.5 }}>
+          This app is invite-only. Enter the code shared at the event to get started.
+        </div>
+
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          placeholder="Access code"
+          type="password"
+          style={{
+            width: "100%",
+            background: C.bgSubtle,
+            border: `1.5px solid ${error ? "#fca5a5" : C.border}`,
+            borderRadius: "10px",
+            padding: "12px 16px",
+            fontSize: "14px",
+            color: C.text,
+            fontFamily: "Inter, sans-serif",
+            marginBottom: "12px",
+            boxSizing: "border-box",
+          }}
+        />
+
+        {error && (
+          <div style={{ fontSize: "12px", color: "#e11d48", background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px" }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !code.trim()}
+          style={{
+            width: "100%",
+            background: loading || !code.trim() ? C.borderGray : `linear-gradient(135deg, ${C.mint}, ${C.blue})`,
+            border: "none",
+            borderRadius: "10px",
+            padding: "13px",
+            color: loading || !code.trim() ? C.text4 : "#fff",
+            fontSize: "14px",
+            fontWeight: 700,
+            cursor: loading || !code.trim() ? "not-allowed" : "pointer",
+            fontFamily: "Inter, sans-serif",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+          }}
+        >
+          {loading ? (
+            <>
+              <div style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              Verifying...
+            </>
+          ) : "Enter JobWing →"}
+        </button>
+      </div>
+      <style>{`
+        @keyframes fadeSlideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        input { outline: none; }
+        input::placeholder { color: #94a3b8; }
+      `}</style>
+    </div>
+  );
+};
+
 // ─── ResumeUpload ─────────────────────────────────────────────────────────────
 
-const ResumeUpload = ({ onProfileExtracted }) => {
+const ResumeUpload = ({ onProfileExtracted, accessCode }) => {
   const [resumeText, setResumeText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -467,7 +599,7 @@ const ResumeUpload = ({ onProfileExtracted }) => {
     try {
       const res = await fetch("/api/resume", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-access-code": accessCode },
         body: JSON.stringify({ text: resumeText }),
       });
       const data = await res.json();
@@ -620,6 +752,8 @@ const ResumeUpload = ({ onProfileExtracted }) => {
 // ─── Main Agent ───────────────────────────────────────────────────────────────
 
 export default function Agent() {
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
   const [view, setView] = useState("dashboard");
   const [userProfile, setUserProfile] = useState({ name: "", field: "", skills: "", experience: "" });
   const [searchForm, setSearchForm] = useState({ role: "", location: "", level: "Any Level" });
@@ -676,6 +810,10 @@ export default function Agent() {
       const dr = localStorage.getItem("dashboardRole");
       if (dr) setDashboardRole(dr);
     } catch {}
+    try {
+      const ac = localStorage.getItem("accessCode");
+      if (ac) { setAccessCode(ac); setIsAuthorized(true); }
+    } catch {}
   }, []);
 
   useEffect(() => { localStorage.setItem("savedJobs", JSON.stringify(savedJobs)); }, [savedJobs]);
@@ -700,7 +838,7 @@ export default function Agent() {
     try {
       const res = await fetch("/api/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-access-code": accessCode },
         body: JSON.stringify({ ...params, userProfile }),
       });
       const data = await res.json();
@@ -741,7 +879,7 @@ export default function Agent() {
     try {
       const res = await fetch("/api/post", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-access-code": accessCode },
         body: JSON.stringify({ jobs: currentJobs, userProfile }),
       });
       const data = await res.json();
@@ -787,6 +925,16 @@ export default function Agent() {
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────
+
+  if (!isAuthorized) {
+    return (
+      <GateScreen onAuthorized={(code) => {
+        setAccessCode(code);
+        setIsAuthorized(true);
+        localStorage.setItem("accessCode", code);
+      }} />
+    );
+  }
 
   return (
     <>
@@ -1261,7 +1409,7 @@ export default function Agent() {
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {filteredJobs.map((job, i) => (
-                        <JobCard key={jKey(job) + i} job={job} index={i} isSaved={isJobSaved(job)} onToggleSave={() => toggleSaveJob(job)} pipelineStage={getPipelineStage(job)} onAddToPipeline={addToPipeline} userProfile={userProfile} />
+                        <JobCard key={jKey(job) + i} job={job} index={i} isSaved={isJobSaved(job)} onToggleSave={() => toggleSaveJob(job)} pipelineStage={getPipelineStage(job)} onAddToPipeline={addToPipeline} userProfile={userProfile} accessCode={accessCode} />
                       ))}
                     </div>
                   )}
@@ -1359,6 +1507,7 @@ export default function Agent() {
                   Upload or paste your resume to extract skills, get AI fit scores, and receive improvement tips
                 </div>
                 <ResumeUpload
+                  accessCode={accessCode}
                   onProfileExtracted={(data) => {
                     if (data.skills?.length) setUserProfile((p) => ({ ...p, skills: data.skills.slice(0, 8).join(", ") }));
                     if (data.experience) setUserProfile((p) => ({ ...p, experience: data.experience }));
