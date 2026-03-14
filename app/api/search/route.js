@@ -4,11 +4,10 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req) {
   try {
-    const { role, location, level, userProfile, resumeText } = await req.json();
+    const { role, location, level, userProfile, resumeText, excludeCompanies } = await req.json();
 
     const levelStr = level && level !== "Any Level" ? level : "";
     const locationStr = location && location.trim() ? `in ${location.trim()}` : "across the US";
-    const jobQuery = [levelStr, role].filter(Boolean).join(" ");
 
     const profileContext =
       userProfile?.skills || userProfile?.field
@@ -20,6 +19,11 @@ export async function POST(req) {
         ? `\n\nCandidate resume summary: ${resumeText.slice(0, 1500)}\nUse the resume to provide more accurate fitScore and fitReason values for each job.`
         : "";
 
+    const excludeContext =
+      excludeCompanies?.length
+        ? `\n\nDo NOT include jobs from these companies (already shown): ${excludeCompanies.join(", ")}.`
+        : "";
+
     const systemPrompt = `You are a job search agent. Search LinkedIn for ${levelStr ? levelStr + " " : ""}${role} jobs ${locationStr} in 2025. Find 10-15 real current postings. Return ONLY a JSON array inside <jobs>...</jobs> tags: [{"company":"...","role":"...","location":"...","level":"...","posted":"...","link":"...","summary":"...","fitScore":null,"fitReason":null}]. If user profile has skills/field, populate fitScore (0-100) and fitReason. After the JSON, write 1-2 sentences on the market.`;
 
     const userMessage = `Find ${levelStr ? levelStr + " " : ""}${role} jobs ${locationStr}`;
@@ -29,7 +33,7 @@ export async function POST(req) {
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4000,
-      system: systemPrompt + profileContext + resumeContext,
+      system: systemPrompt + profileContext + resumeContext + excludeContext,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages,
     });

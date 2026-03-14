@@ -284,7 +284,7 @@ const JobCard = ({ job, index = 0, isSaved, onToggleSave, pipelineStage, onAddTo
           { id: "cold-dm",        label: "✉️ Cold DM" },
           { id: "cover-letter",   label: "📄 Cover Letter" },
           { id: "interview-prep", label: "🎤 Interview Prep" },
-          { id: "find-recruiter", label: "👤 Recruiter" },
+          { id: "find-recruiter", label: "👤 Find Recruiter" },
         ].map((a) => (
           <button
             key={a.id}
@@ -758,6 +758,7 @@ export default function Agent() {
   const [userProfile, setUserProfile] = useState({ name: "", field: "", skills: "", experience: "" });
   const [searchForm, setSearchForm] = useState({ role: "", location: "", level: "Any Level" });
   const [searchLoading, setSearchLoading] = useState(false);
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
   const [searchCache, setSearchCache] = useState({});
   const [currentCacheKey, setCurrentCacheKey] = useState(null);
   const [searchHistory, setSearchHistory] = useState([]);
@@ -854,6 +855,29 @@ export default function Agent() {
 
   const handleSearchSubmit = () => { if (!searchForm.role.trim()) return; runSearch(searchForm); };
   const handleChipClick = (chipRole) => { const p = { ...searchForm, role: chipRole }; setSearchForm(p); runSearch(p); };
+
+  // ── Load More ──
+  const loadMore = async () => {
+    if (!currentResult || loadMoreLoading) return;
+    setLoadMoreLoading(true);
+    const excludeCompanies = currentJobs.map((j) => j.company);
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-access-code": accessCode },
+        body: JSON.stringify({ ...currentResult.params, userProfile, excludeCompanies }),
+      });
+      const data = await res.json();
+      const newJobs = data.jobs || [];
+      if (newJobs.length > 0) {
+        setSearchCache((prev) => ({
+          ...prev,
+          [currentCacheKey]: { ...prev[currentCacheKey], jobs: [...prev[currentCacheKey].jobs, ...newJobs] },
+        }));
+      }
+    } catch (err) { console.error(err); }
+    setLoadMoreLoading(false);
+  };
 
   // ── Saved ──
   const isJobSaved = (job) => savedJobs.some((j) => jKey(j) === jKey(job));
@@ -1103,7 +1127,7 @@ export default function Agent() {
                   {userProfile.name ? `Hi ${userProfile.name}! 👋` : "Welcome to JobWing 🚀"}
                 </div>
                 <div style={{ fontSize: "14px", color: C.text3 }}>
-                  Not just a job board — cold DMs, cover letters, interview prep, pipeline tracking, and recruiter suggestions, all in one place.
+                  Not just a job board: cold DMs, cover letters, interview prep, pipeline tracking, and recruiter suggestions, all in one place.
                 </div>
               </div>
 
@@ -1411,6 +1435,38 @@ export default function Agent() {
                       {filteredJobs.map((job, i) => (
                         <JobCard key={jKey(job) + i} job={job} index={i} isSaved={isJobSaved(job)} onToggleSave={() => toggleSaveJob(job)} pipelineStage={getPipelineStage(job)} onAddToPipeline={addToPipeline} userProfile={userProfile} accessCode={accessCode} />
                       ))}
+                    </div>
+                  )}
+
+                  {/* Load More */}
+                  {!cityFilter && currentJobs.length > 0 && (
+                    <div style={{ textAlign: "center", marginTop: "20px" }}>
+                      <button
+                        onClick={loadMore}
+                        disabled={loadMoreLoading}
+                        style={{
+                          background: loadMoreLoading ? C.borderGray : C.bgCard,
+                          border: `1px solid ${loadMoreLoading ? C.borderGray : C.border}`,
+                          borderRadius: "20px",
+                          padding: "10px 28px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: loadMoreLoading ? C.text4 : C.mintDark,
+                          cursor: loadMoreLoading ? "not-allowed" : "pointer",
+                          fontFamily: "Inter, sans-serif",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        {loadMoreLoading ? (
+                          <>
+                            <div style={{ width: 12, height: 12, border: `2px solid ${C.mintLight}`, borderTopColor: C.mint, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                            Finding more...
+                          </>
+                        ) : `Load more jobs (${currentJobs.length} so far)`}
+                      </button>
                     </div>
                   )}
                 </div>
