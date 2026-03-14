@@ -26,39 +26,13 @@ export async function POST(req) {
 
     const messages = [{ role: "user", content: userMessage }];
 
-    let response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-6",
       max_tokens: 4000,
       system: systemPrompt + profileContext + resumeContext,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages,
     });
-
-    // Agentic loop: keep going while stop_reason is tool_use
-    while (response.stop_reason === "tool_use") {
-      const assistantMessage = { role: "assistant", content: response.content };
-
-      const toolResults = response.content
-        .filter((block) => block.type === "tool_use")
-        .map((toolUseBlock) => ({
-          type: "tool_result",
-          tool_use_id: toolUseBlock.id,
-          content: toolUseBlock.input?.query
-            ? `Search results for: ${toolUseBlock.input.query}`
-            : "Search completed.",
-        }));
-
-      messages.push(assistantMessage);
-      messages.push({ role: "user", content: toolResults });
-
-      response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4000,
-        system: systemPrompt + profileContext + resumeContext,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages,
-      });
-    }
 
     const fullText = response.content
       .filter((b) => b.type === "text")
