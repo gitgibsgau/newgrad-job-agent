@@ -4,7 +4,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req) {
   try {
-    const { job, action, userProfile } = await req.json();
+    const { job, action, userProfile, resumeText } = await req.json();
 
     const profile =
       userProfile?.name || userProfile?.field || userProfile?.skills
@@ -22,6 +22,24 @@ Q1: [question]
 Tip: [tip]
 
 Q2: ...`,
+
+      "tailor-resume": `Review this resume for the ${job.role} role at ${job.company} in ${job.location}. ${profile}
+
+Resume:
+${resumeText ? resumeText.slice(0, 2000) : "No resume provided"}
+
+Provide exactly 5 specific, actionable bullet points on how to tailor this resume for this specific role. Focus on:
+- Keywords to add
+- Experience to highlight or reframe
+- Skills gaps to address
+- Formatting or structure improvements
+
+Format as:
+• [specific suggestion]
+• [specific suggestion]
+• [specific suggestion]
+• [specific suggestion]
+• [specific suggestion]`,
     };
 
     const response = await client.messages.create({
