@@ -73,6 +73,13 @@ Format as:
     return Response.json({ content: response.content[0]?.text || "" });
   } catch (err) {
     console.error(err);
+    if (err.status === 429) {
+      const retryAfter = err.headers?.["retry-after"] || 60;
+      return Response.json(
+        { error: "rate_limit", retryAfter: parseInt(retryAfter) },
+        { status: 429 }
+      );
+    }
     return Response.json({ error: err.message }, { status: 500 });
   }
 }

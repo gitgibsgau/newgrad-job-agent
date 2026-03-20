@@ -31,10 +31,9 @@ export async function POST(req) {
     const messages = [{ role: "user", content: userMessage }];
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2000,
       system: systemPrompt + profileContext + resumeContext + excludeContext,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages,
     });
 
@@ -63,6 +62,13 @@ export async function POST(req) {
     return Response.json({ jobs, summary });
   } catch (err) {
     console.error(err);
+    if (err.status === 429) {
+      const retryAfter = err.headers?.["retry-after"] || 60;
+      return Response.json(
+        { error: "rate_limit", retryAfter: parseInt(retryAfter) },
+        { status: 429 }
+      );
+    }
     return Response.json({ error: err.message }, { status: 500 });
   }
 }

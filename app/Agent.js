@@ -759,6 +759,7 @@ export default function Agent() {
   const [searchForm, setSearchForm] = useState({ role: "", location: "", level: "Any Level" });
   const [searchLoading, setSearchLoading] = useState(false);
   const [loadMoreLoading, setLoadMoreLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [searchCache, setSearchCache] = useState({});
   const [currentCacheKey, setCurrentCacheKey] = useState(null);
   const [searchHistory, setSearchHistory] = useState([]);
@@ -834,6 +835,7 @@ export default function Agent() {
     const key = cacheKey(params);
     if (!forceRefresh && searchCache[key]) { setCurrentCacheKey(key); setView("search"); return; }
     setSearchLoading(true);
+    setSearchError("");
     setCurrentCacheKey(key);
     setView("search");
     try {
@@ -843,12 +845,16 @@ export default function Agent() {
         body: JSON.stringify({ ...params, userProfile }),
       });
       const data = await res.json();
-      const jobs = data.jobs || [];
-      setSearchCache((prev) => ({ ...prev, [key]: { jobs, summary: data.summary || "", timestamp: Date.now(), params } }));
-      setSearchHistory((prev) => {
-        const filtered = prev.filter((h) => h.key !== key);
-        return [{ key, params, timestamp: Date.now(), count: jobs.length }, ...filtered].slice(0, 8);
-      });
+      if (data.error === "rate_limit") {
+        setSearchError(`Too many requests — please wait ${data.retryAfter}s before searching again.`);
+      } else {
+        const jobs = data.jobs || [];
+        setSearchCache((prev) => ({ ...prev, [key]: { jobs, summary: data.summary || "", timestamp: Date.now(), params } }));
+        setSearchHistory((prev) => {
+          const filtered = prev.filter((h) => h.key !== key);
+          return [{ key, params, timestamp: Date.now(), count: jobs.length }, ...filtered].slice(0, 8);
+        });
+      }
     } catch (err) { console.error(err); }
     setSearchLoading(false);
   };
@@ -868,12 +874,16 @@ export default function Agent() {
         body: JSON.stringify({ ...currentResult.params, userProfile, excludeCompanies }),
       });
       const data = await res.json();
-      const newJobs = data.jobs || [];
-      if (newJobs.length > 0) {
-        setSearchCache((prev) => ({
-          ...prev,
-          [currentCacheKey]: { ...prev[currentCacheKey], jobs: [...prev[currentCacheKey].jobs, ...newJobs] },
-        }));
+      if (data.error === "rate_limit") {
+        setSearchError(`Too many requests — please wait ${data.retryAfter}s before loading more.`);
+      } else {
+        const newJobs = data.jobs || [];
+        if (newJobs.length > 0) {
+          setSearchCache((prev) => ({
+            ...prev,
+            [currentCacheKey]: { ...prev[currentCacheKey], jobs: [...prev[currentCacheKey].jobs, ...newJobs] },
+          }));
+        }
       }
     } catch (err) { console.error(err); }
     setLoadMoreLoading(false);
@@ -1368,11 +1378,17 @@ export default function Agent() {
                 </div>
               </div>
 
+              {searchError && (
+                <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "8px", padding: "12px 16px", marginBottom: "16px", fontSize: "13px", color: "#856404", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>⚠️ {searchError}</span>
+                  <button onClick={() => setSearchError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#856404", fontSize: "16px", padding: "0 4px" }}>✕</button>
+                </div>
+              )}
               {searchLoading ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 20px", gap: "16px" }}>
                   <div style={{ width: 36, height: 36, border: `3px solid ${C.mintLight}`, borderTopColor: C.mint, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <div style={{ color: C.mintDark, fontSize: "14px", fontWeight: 500 }}>Searching LinkedIn...</div>
-                  <div style={{ color: C.text4, fontSize: "12px" }}>This may take up to 30 seconds</div>
+                  <div style={{ color: C.mintDark, fontSize: "14px", fontWeight: 500 }}>Searching jobs...</div>
+                  <div style={{ color: C.text4, fontSize: "12px" }}>This may take up to 15 seconds</div>
                 </div>
               ) : currentResult ? (
                 <div>
